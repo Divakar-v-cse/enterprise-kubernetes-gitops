@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: platform
 
 resources:
+  - ../../core
   - ../../base
 
 # Single replica per service keeps the Kind node within its 3 GB memory budget.
@@ -61,3 +62,4 @@ labels:
   - includeSelectors: false
     pairs:
       environment: development
+

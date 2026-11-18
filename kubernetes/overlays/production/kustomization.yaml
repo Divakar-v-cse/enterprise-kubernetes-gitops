@@ -5,6 +5,7 @@ kind: Kustomization
 namespace: platform-prod
 
 resources:
+  - ../../core
   - ../../base
 
 replicas:
@@ -62,3 +63,4 @@ labels:
   - includeSelectors: false
     pairs:
       environment: production
+
