@@ -1,0 +1,119 @@
+name: Deploy (GitOps)
+
+# This workflow never runs kubectl against a cluster. It updates the image tag
+# in Git and lets Argo CD reconcile. Production requires a manual approval.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target overlay
+        type: choice
+        options: [development, production]
+        default: development
+      image_tag:
+        description: Image tag to deploy (defaults to the commit SHA)
+        required: false
+      service:
+        description: Service to update
+        type: choice
+        options: [all, api-gateway, user-service, product-service, order-service, notification-service, frontend, platform-api]
+        default: all
+  push:
+    branches: [main]
+    paths:
+      - "applications/**"
+      - "helm/**"
+      - "kubernetes/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'development' }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Pre-deploy verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+      - name: Helm lint all charts
+        run: |
+          helm lint helm/microservice
+          for chart in helm/charts/*/; do helm lint "$chart"; done
+      - name: Render manifests
+        run: |
+          for chart in helm/charts/*/; do
+            helm template "$(basename "$chart")" "$chart" --namespace platform > /dev/null
+          done
+
+  update-dev:
+    name: Update development desired state
+    needs: verify
+    if: github.event_name == 'push' || github.event.inputs.environment == 'development'
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITOPS_PAT || secrets.GITHUB_TOKEN }}
+      - name: Bump image tags
+        env:
+          TAG: ${{ github.event.inputs.image_tag || github.sha }}
+          SERVICE: ${{ github.event.inputs.service || 'all' }}
+        run: |
+          python - <<'PY'
+          import os, re, pathlib
+          tag, service = os.environ["TAG"], os.environ["SERVICE"]
+          charts = pathlib.Path("helm/charts")
+          targets = [service] if service != "all" else [p.name for p in charts.iterdir() if p.is_dir()]
+          for name in targets:
+              values = charts / name / "values.yaml"
+              if not values.exists():
+                  continue
+              text = re.sub(r'(?m)^(\s*tag:\s*).*$', rf'\g<1>"{tag}"', values.read_text())
+              values.write_text(text)
+              print(f"updated {values} -> {tag}")
+          PY
+      - name: Commit and push
+        run: |
+          git config user.name "gitops-bot"
+          git config user.email "gitops-bot@users.noreply.github.com"
+          if git diff --quiet; then echo "No changes"; exit 0; fi
+          git commit -am "chore(deploy): promote ${TAG:-${{ github.sha }}} to development"
+          git push
+
+  update-prod:
+    name: Update production desired state (manual approval)
+    needs: verify
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    # Configure required reviewers on this GitHub Environment.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITOPS_PAT || secrets.GITHUB_TOKEN }}
+      - name: Bump production overlay
+        env:
+          TAG: ${{ github.event.inputs.image_tag || github.sha }}
+        run: |
+          python - <<'PY'
+          import os, pathlib, re
+          tag = os.environ["TAG"]
+          path = pathlib.Path("kubernetes/overlays/production/kustomization.yaml")
+          text = path.read_text()
+          text = re.sub(r'(?m)^(\s*newTag:\s*).*$', rf'\g<1>"{tag}"', text)
+          path.write_text(text)
+          print(text)
+          PY
+      - name: Commit and let Argo CD wait for approval
+        run: |
+          git config user.name "gitops-bot"
+          git config user.email "gitops-bot@users.noreply.github.com"
+          git commit -am "chore(deploy): promote ${TAG:-${{ github.sha }}} to production (requires Argo CD approval)"
+          git push

@@ -1,0 +1,192 @@
+// Optional Jenkins pipeline mirroring .github/workflows (same stages, same gates).
+// Requires: Jenkins with Docker, the Docker Pipeline and Kubernetes CLI plugins,
+// credentials `gitops-github-token` and `ghcr-token`.
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+    buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
+    timeout(time: 45, unit: 'MINUTES')
+    disableConcurrentBuilds()
+  }
+
+  environment {
+    APP_VERSION   = "${env.GIT_COMMIT?.take(12) ?: 'local'}"
+    IMAGE_REGISTRY = "ghcr.io/example-org/enterprise-kubernetes-gitops"
+    HELM_VERSION  = "3.16.3"
+    PYTHON_IMAGE  = "python:3.12-slim"
+  }
+
+  parameters {
+    choice(name: 'TARGET_ENV', choices: ['development', 'production'], description: 'Deployment overlay to update')
+    booleanParam(name: 'RUN_SECURITY_SCAN', defaultValue: true, description: 'Run Trivy and Checkov')
+    string(name: 'IMAGE_TAG', defaultValue: '', description: 'Override image tag (defaults to commit SHA)')
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+        sh 'git rev-parse --short HEAD'
+      }
+    }
+
+    stage('Lint') {
+      steps {
+        sh "docker run --rm -v ${WORKSPACE}:/src -w /src ${PYTHON_IMAGE} " +
+           "sh -c 'pip install --quiet ruff && ruff check applications platform-api tools tests'"
+      }
+    }
+
+    stage('Unit & API tests') {
+      parallel {
+        stage('api-gateway') {
+          steps { sh './scripts/ci/test-service.sh applications/api-gateway' }
+        }
+        stage('user-service') {
+          steps { sh './scripts/ci/test-service.sh applications/user-service' }
+        }
+        stage('product-service') {
+          steps { sh './scripts/ci/test-service.sh applications/product-service' }
+        }
+        stage('order-service') {
+          steps { sh './scripts/ci/test-service.sh applications/order-service' }
+        }
+        stage('notification-service') {
+          steps { sh './scripts/ci/test-service.sh applications/notification-service' }
+        }
+        stage('platform-api') {
+          steps { sh './scripts/ci/test-service.sh platform-api' }
+        }
+      }
+    }
+
+    stage('Build images') {
+      steps {
+        sh '''
+          set -e
+          for svc in api-gateway user-service product-service order-service notification-service; do
+            docker build -f applications/$svc/Dockerfile -t $IMAGE_REGISTRY/$svc:$APP_VERSION .
+          done
+          docker build -f docker/platform-api.Dockerfile -t $IMAGE_REGISTRY/platform-api:$APP_VERSION .
+          docker build -f applications/frontend/Dockerfile -t $IMAGE_REGISTRY/frontend:$APP_VERSION .
+        '''
+      }
+    }
+
+    stage('Security scans') {
+      when { expression { params.RUN_SECURITY_SCAN } }
+      steps {
+        sh '''
+          set -e
+          mkdir -p security/artifacts
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.57.1 image --severity HIGH,CRITICAL --format table \
+            --output /tmp/trivy.txt $IMAGE_REGISTRY/api-gateway:$APP_VERSION || true
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.57.1 image --severity HIGH,CRITICAL --exit-code 1 \
+            $IMAGE_REGISTRY/api-gateway:$APP_VERSION
+          docker run --rm -v $WORKSPACE:/src aquasec/trivy:0.57.1 config --severity HIGH,CRITICAL /src/kubernetes
+        '''
+      }
+    }
+
+    stage('Validate Kubernetes & Helm') {
+      steps {
+        sh '''
+          set -e
+          docker run --rm -v $WORKSPACE:/src -w /src alpine/helm:$HELM_VERSION lint helm/microservice
+          for chart in helm/charts/*/; do
+            docker run --rm -v $WORKSPACE:/src -w /src alpine/helm:$HELM_VERSION lint "$chart"
+            docker run --rm -v $WORKSPACE:/src -w /src alpine/helm:$HELM_VERSION template "$(basename "$chart")" "$chart" --namespace platform > /dev/null
+          done
+        '''
+      }
+    }
+
+    stage('Publish images') {
+      when { branch 'main' }
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'ghcr-token', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+          sh '''
+            set -e
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            for image in $(docker images --format '{{.Repository}}:{{.Tag}}' | grep "$IMAGE_REGISTRY"); do
+              docker push "$image"
+            done
+          '''
+        }
+      }
+    }
+
+    stage('Update GitOps config (dev)') {
+      when { expression { params.TARGET_ENV == 'development' } }
+      steps {
+        sh '''
+          set -e
+          TAG=${IMAGE_TAG:-$APP_VERSION}
+          python3 - "$TAG" <<'PY'
+          import pathlib, re, sys
+          tag = sys.argv[1]
+          for values in pathlib.Path("helm/charts").glob("*/values.yaml"):
+              text = re.sub(r'(?m)^(\\s*tag:\\s*).*$', rf'\\g<1>"{tag}"', values.read_text())
+              values.write_text(text)
+          PY
+          git config user.name "jenkins-gitops"
+          git config user.email "jenkins@example.invalid"
+          git commit -am "chore(deploy): promote $TAG to development" || echo "nothing to commit"
+          git push origin HEAD:main
+        '''
+      }
+    }
+
+    stage('Production approval') {
+      when { expression { params.TARGET_ENV == 'production' } }
+      steps {
+        // Hard gate: a human must approve before the production overlay changes.
+        input message: 'Promote this build to production? Argo CD will still require a manual sync.',
+              ok: 'Approve production promotion',
+              submitter: 'platform-leads'
+        sh '''
+          set -e
+          python3 - "${IMAGE_TAG:-$APP_VERSION}" <<'PY'
+          import pathlib, re, sys
+          tag = sys.argv[1]
+          path = pathlib.Path("kubernetes/overlays/production/kustomization.yaml")
+          path.write_text(re.sub(r'(?m)^(\\s*newTag:\\s*).*$', rf'\\g<1>"{tag}"', path.read_text()))
+          PY
+          git config user.name "jenkins-gitops"
+          git config user.email "jenkins@example.invalid"
+          git commit -am "chore(deploy): promote ${IMAGE_TAG:-$APP_VERSION} to production"
+          git push origin HEAD:main
+        '''
+      }
+    }
+
+    stage('Verify rollout (Argo CD)') {
+      when { expression { params.TARGET_ENV == 'development' } }
+      steps {
+        sh '''
+          set -e
+          if command -v argocd >/dev/null 2>&1; then
+            argocd app wait api-gateway --health --timeout 300 || true
+            argocd app get api-gateway
+          else
+            echo "argocd CLI not installed on this agent; verify in the Argo CD UI."
+          fi
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      junit allowEmptyResults: true, testResults: '**/reports/junit-*.xml'
+      archiveArtifacts artifacts: 'security/artifacts/**', allowEmptyArchive: true
+    }
+    failure {
+      echo 'Pipeline failed — check the stage logs and docs/TROUBLESHOOTING.md.'
+    }
+  }
+}
