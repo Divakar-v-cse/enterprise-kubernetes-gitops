@@ -1,0 +1,106 @@
+# Defaults are deliberately safe: non-root, read-only root filesystem,
+# dropped capabilities, bounded resources and probes on every container.
+
+replicaCount: 2
+
+image:
+  repository: platform/microservice
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+containerPort: 8000
+
+service:
+  type: ClusterIP
+  port: 8000
+  name: http
+  annotations: {}
+
+# Shared ConfigMap created by the platform-core application.
+configMapRef: platform-config
+# Additional plain environment variables.
+env: []
+# Secret-backed environment variables: [{name, secretName, key}]
+secretEnv: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+probes:
+  startup:
+    enabled: true
+    path: /health/live
+    periodSeconds: 3
+    failureThreshold: 30
+  liveness:
+    enabled: true
+    path: /health/live
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /health/ready
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+serviceAccount:
+  create: false
+  name: ""
+  automount: false
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  behavior: {}
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+terminationGracePeriodSeconds: 30
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+# Escape hatches for static web servers that need a writable cache directory.
+extraVolumes: []
+extraVolumeMounts: []

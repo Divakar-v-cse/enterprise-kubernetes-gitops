@@ -1,0 +1,12 @@
+apiVersion: v2
+name: microservice
+description: >-
+  Opinionated reusable chart for the platform's FastAPI/React services:
+  hardened pod security, three probes, PDB, optional HPA, metrics annotations.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.27.0-0"
+keywords: [kubernetes, microservice, fastapi, gitops]
+maintainers:
+  - name: Platform Engineering

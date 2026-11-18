@@ -1,0 +1,9 @@
+{{ .Chart.Name }} deployed as {{ include "microservice.fullname" . }} in {{ .Release.Namespace }}.
+
+  Image:    {{ .Values.image.repository }}:{{ .Values.image.tag }}
+  Service:  {{ include "microservice.fullname" . }}:{{ .Values.service.port }}
+  Probes:   startup {{ .Values.probes.startup.path }} / readiness {{ .Values.probes.readiness.path }} / liveness {{ .Values.probes.liveness.path }}
+  HPA:      {{ if .Values.autoscaling.enabled }}{{ .Values.autoscaling.minReplicas }}..{{ .Values.autoscaling.maxReplicas }} replicas @ {{ .Values.autoscaling.targetCPUUtilizationPercentage }}% CPU{{ else }}disabled{{ end }}
+
+Verify:
+  kubectl -n {{ .Release.Namespace }} get deploy,pods -l app.kubernetes.io/instance={{ .Release.Name }}
