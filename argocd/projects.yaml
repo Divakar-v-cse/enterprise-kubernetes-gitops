@@ -12,6 +12,8 @@ spec:
   sourceRepos:
     - "*"
   destinations:
+    - namespace: argocd
+      server: https://kubernetes.default.svc
     - namespace: platform
       server: https://kubernetes.default.svc
     - namespace: platform-prod
@@ -31,11 +33,6 @@ spec:
       kind: ClusterRoleBinding
     - group: networking.k8s.io
       kind: NetworkPolicy
-  namespaceResourceBlacklist:
-    - group: ""
-      kind: ResourceQuota
-    - group: ""
-      kind: LimitRange
   roles:
     - name: read-only
       description: View applications and resources without sync rights
@@ -50,3 +47,4 @@ spec:
         - p, proj:platform:deployer, applications, get, platform/*, allow
       groups:
         - platform-deployers
+

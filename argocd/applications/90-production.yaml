@@ -14,7 +14,7 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: http://host.docker.internal:8099/enterprise-kubernetes-gitops.git
+    repoURL: git://host.docker.internal:9418/enterprise-kubernetes-gitops.git
     targetRevision: main
     path: kubernetes/overlays/production
   destination:
@@ -25,3 +25,4 @@ spec:
       - CreateNamespace=false
     retry:
       limit: 1
+

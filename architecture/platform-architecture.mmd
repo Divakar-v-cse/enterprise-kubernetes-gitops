@@ -1,0 +1,91 @@
+flowchart TB
+    subgraph dev["Developer workflow"]
+        DEV["Developer<br/>commit + push"]
+        GHA["GitHub Actions / Jenkins<br/>lint · tests · build · scan"]
+        REG[("Container registry<br/>GHCR")]
+    end
+
+    subgraph git["Git — single source of truth"]
+        REPO["enterprise-kubernetes-gitops<br/>apps · helm · k8s · monitoring"]
+        VALUES["helm/charts/*/values.yaml<br/>image tags = desired state"]
+    end
+
+    subgraph cp["Argo CD control plane (argocd namespace)"]
+        APPSET["App-of-Apps<br/>sync waves -10 → 10"]
+        PROD["platform-production<br/>manual sync (approval gate)"]
+    end
+
+    subgraph k8s["Kind cluster — gitops-platform"]
+        subgraph nsplatform["namespace: platform"]
+            ING["NGINX Ingress<br/>:18080"]
+            FE["frontend<br/>React + NGINX"]
+            GW["api-gateway<br/>auth · rate limit · fan-out"]
+            US["user-service"]
+            PS["product-service"]
+            OS["order-service<br/>saga + compensation"]
+            NS["notification-service"]
+            PA["platform-api<br/>read-only K8s API"]
+            PG[("PostgreSQL<br/>users · products<br/>orders · notifications")]
+        end
+        subgraph nsmon["namespace: monitoring"]
+            PROM["Prometheus"]
+            AM["Alertmanager"]
+            GRAF["Grafana<br/>6 dashboards"]
+            KSM["kube-state-metrics"]
+            NE["node-exporter"]
+        end
+        subgraph nslog["namespace: logging"]
+            LOKI["Loki"]
+            PT["Promtail DaemonSet"]
+        end
+        subgraph nssec["security guardrails"]
+            NP["NetworkPolicies<br/>default deny"]
+            RBAC["RBAC<br/>read-only SA"]
+            PSS["Pod Security<br/>restricted"]
+            PDB["PDBs + HPA + Quota"]
+        end
+    end
+
+    DEV -->|push code| GHA
+    GHA -->|build + Trivy scan| REG
+    GHA -->|update image tag| VALUES
+    REPO --> VALUES
+    REPO -->|watch / poll| APPSET
+    APPSET -->|auto-sync dev| nsplatform
+    APPSET -->|auto-sync| nsmon
+    APPSET -->|auto-sync| nslog
+    PROD -->|human approves sync| nsplatform
+    REG -.->|kind load / pull| nsplatform
+
+    ING --> FE
+    ING --> GW
+    ING --> PA
+    GW --> US
+    GW --> PS
+    GW --> OS
+    GW --> NS
+    OS -->|reserve stock| PS
+    OS -->|validate user| US
+    OS -->|notify| NS
+    US --> PG
+    PS --> PG
+    OS --> PG
+    NS --> PG
+
+    PROM -->|scrape /metrics| GW
+    PROM -->|scrape /metrics| US
+    PROM -->|scrape /metrics| PS
+    PROM -->|scrape /metrics| OS
+    PROM -->|scrape /metrics| NS
+    PROM -->|scrape /metrics| PA
+    PROM --> KSM
+    PROM --> NE
+    PROM -->|evaluate rules| AM
+    GRAF -->|query| PROM
+    GRAF -->|query| LOKI
+    PT -->|ship pod logs| LOKI
+    PA -->|read-only| k8s
+    PA -->|query| PROM
+    PA -->|query| AM
+    PA -->|query| LOKI
+    PA -->|query| APPSET

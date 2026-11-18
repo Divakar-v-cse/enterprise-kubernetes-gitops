@@ -1,0 +1,7 @@
+{
+  "generated_at": "2026-11-18T12:00:00Z",
+  "scanners": ["trivy", "checkov", "kubescape"],
+  "summary": {"critical": 0, "high": 0, "medium": 0, "low": 0, "total": 0},
+  "findings": [],
+  "note": "Placeholder replaced by tools/security-scan.ps1 output after the first scan."
+}
