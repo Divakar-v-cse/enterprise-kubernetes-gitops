@@ -98,7 +98,7 @@ jobs:
             dockerfile: applications/frontend/Dockerfile
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Build image for scanning
         run: docker build -f ${{ matrix.dockerfile }} -t local/${{ matrix.image }}:${{ github.sha }} .
       - name: Trivy image scan
