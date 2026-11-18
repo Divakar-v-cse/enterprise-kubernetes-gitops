@@ -1,0 +1,22 @@
+# Kind cluster used for local development of the platform.
+# Creates a single-node cluster with host port mappings so the NGINX ingress
+# controller can be reached on http://localhost:18080 and https://localhost:18443.
+# Non-default host ports avoid collisions with other local Docker stacks.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: gitops-platform
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 18080
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 18443
+        protocol: TCP

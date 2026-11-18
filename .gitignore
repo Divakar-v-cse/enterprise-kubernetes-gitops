@@ -1,0 +1,61 @@
+# ---- Secrets & credentials (never commit) ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*kubeconfig*
+.kube/
+secrets.local.yaml
+**/secrets.yaml
+!**/secrets.example.yaml
+**/values.local.yaml
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+coverage.json
+junit-*.xml
+
+# ---- Node / React ----
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+
+# ---- Container / scan artifacts ----
+*.tar
+*.tar.gz
+scan-results/*.json
+security/artifacts/
+trivy-cache/
+.platform-api-cache/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# ---- Local runtime data ----
+local-data/
+*.db
+*.sqlite3
+tmp/
+logs/*.log

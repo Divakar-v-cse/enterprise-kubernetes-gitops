@@ -1,0 +1,21 @@
+# Keep build contexts small and secrets out of images.
+.git
+.github
+.gitignore
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.venv
+**/node_modules
+**/dist
+docs
+screenshots
+architecture
+demo
+security/artifacts
+tests
+*.md
+.env
+.env.*
+kubeconfig*
+*.log
