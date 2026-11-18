@@ -1,0 +1,27 @@
+# Production promotion gate: no automated sync. A human with the `platform`
+# project's deployer role must review the diff and click Sync (or run
+# `argocd app sync platform-production`). This is the deliberate
+# "manual approval for production" control.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-production
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: http://host.docker.internal:8099/enterprise-kubernetes-gitops.git
+    targetRevision: main
+    path: kubernetes/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: platform-prod
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 1

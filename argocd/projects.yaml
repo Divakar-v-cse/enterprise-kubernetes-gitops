@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Enterprise Kubernetes GitOps Platform (microservices, observability, security)
+  # Replace with your Git remote. Wildcards keep forks working without editing
+  # every Application.
+  sourceRepos:
+    - "*"
+  destinations:
+    - namespace: platform
+      server: https://kubernetes.default.svc
+    - namespace: platform-prod
+      server: https://kubernetes.default.svc
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+    - namespace: logging
+      server: https://kubernetes.default.svc
+    - namespace: security
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+  roles:
+    - name: read-only
+      description: View applications and resources without sync rights
+      policies:
+        - p, proj:platform:read-only, applications, get, platform/*, allow
+      groups:
+        - platform-viewers
+    - name: deployer
+      description: Sync applications in development only
+      policies:
+        - p, proj:platform:deployer, applications, sync, platform/*, allow
+        - p, proj:platform:deployer, applications, get, platform/*, allow
+      groups:
+        - platform-deployers
