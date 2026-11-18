@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Build context: repository root -> docker build -f applications/api-gateway/Dockerfile .
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /build
 RUN python -m venv /opt/venv
@@ -8,7 +8,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY applications/api-gateway/requirements.txt ./requirements.txt
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-FROM python:3.12-slim AS runtime
+FROM python:3.15-slim AS runtime
 ARG APP_VERSION=1.0.0
 LABEL org.opencontainers.image.title="api-gateway" \
       org.opencontainers.image.version="${APP_VERSION}" \
