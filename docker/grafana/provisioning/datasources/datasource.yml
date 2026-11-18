@@ -1,0 +1,11 @@
+apiVersion: 1
+# Compose-specific datasource (in-cluster Grafana uses monitoring/grafana/provisioning).
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      timeInterval: 15s

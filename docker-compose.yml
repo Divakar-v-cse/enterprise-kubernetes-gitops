@@ -1,0 +1,259 @@
+# Local development stack for the Enterprise Kubernetes GitOps Platform.
+#   docker compose up -d --build
+#   UI:           http://localhost:13000/ops
+#   Gateway:      http://localhost:18000/api/health
+#   Platform API: http://localhost:18081/api/health
+#   Prometheus:   http://localhost:19090   (profile: observability)
+#   Grafana:      http://localhost:13001   (profile: observability, admin/admin local only)
+name: enterprise-gitops-platform
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks: [platform]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+x-app-env: &app-env
+  APP_ENV: development
+  LOG_LEVEL: INFO
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    <<: *service-defaults
+    environment:
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform}
+      POSTGRES_DB: platform
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform -d platform"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
+
+  user-service:
+    build: { context: ., dockerfile: applications/user-service/Dockerfile }
+    image: platform/user-service:1.0.0
+    <<: *service-defaults
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgresql+asyncpg://platform:${POSTGRES_PASSWORD:-platform}@postgres:5432/users
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports: ["18001:8001"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/health/ready',timeout=2).status==200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 384M }
+
+  product-service:
+    build: { context: ., dockerfile: applications/product-service/Dockerfile }
+    image: platform/product-service:1.0.0
+    <<: *service-defaults
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgresql+asyncpg://platform:${POSTGRES_PASSWORD:-platform}@postgres:5432/products
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports: ["18002:8002"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8002/health/ready',timeout=2).status==200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 384M }
+
+  order-service:
+    build: { context: ., dockerfile: applications/order-service/Dockerfile }
+    image: platform/order-service:1.0.0
+    <<: *service-defaults
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgresql+asyncpg://platform:${POSTGRES_PASSWORD:-platform}@postgres:5432/orders
+      USER_SERVICE_URL: http://user-service:8001
+      PRODUCT_SERVICE_URL: http://product-service:8002
+      NOTIFICATION_SERVICE_URL: http://notification-service:8004
+      NOTIFICATION_REQUIRED: "false"
+    depends_on:
+      postgres: { condition: service_healthy }
+      user-service: { condition: service_healthy }
+      product-service: { condition: service_healthy }
+    ports: ["18003:8003"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8003/health/ready',timeout=2).status==200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 25s
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 384M }
+
+  notification-service:
+    build: { context: ., dockerfile: applications/notification-service/Dockerfile }
+    image: platform/notification-service:1.0.0
+    <<: *service-defaults
+    environment:
+      <<: *app-env
+      DATABASE_URL: postgresql+asyncpg://platform:${POSTGRES_PASSWORD:-platform}@postgres:5432/notifications
+      NOTIFICATION_FAILURE_RATE: "0"
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports: ["18004:8004"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8004/health/ready',timeout=2).status==200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 384M }
+
+  api-gateway:
+    build: { context: ., dockerfile: applications/api-gateway/Dockerfile }
+    image: platform/api-gateway:1.0.0
+    <<: *service-defaults
+    environment:
+      <<: *app-env
+      USER_SERVICE_URL: http://user-service:8001
+      PRODUCT_SERVICE_URL: http://product-service:8002
+      ORDER_SERVICE_URL: http://order-service:8003
+      NOTIFICATION_SERVICE_URL: http://notification-service:8004
+      PUBLIC_API_KEY: ${PUBLIC_API_KEY:-demo-public-key}
+      RATE_LIMIT_PER_MINUTE: "240"
+      CORS_ALLOW_ORIGINS: http://localhost:5173,http://localhost:13000,http://localhost:18081
+    depends_on:
+      user-service: { condition: service_healthy }
+      product-service: { condition: service_healthy }
+      order-service: { condition: service_healthy }
+      notification-service: { condition: service_healthy }
+    ports: ["18005:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=2).status==200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 320M }
+
+  platform-api:
+    build: { context: ., dockerfile: docker/platform-api.Dockerfile }
+    image: platform/platform-api:1.0.0
+    <<: *service-defaults
+    environment:
+      APP_ENV: development
+      PLATFORM_API_TOKEN: ${PLATFORM_API_TOKEN:-platform-demo-token}
+      PLATFORM_AUTH_ENABLED: "true"
+      # The compose network cannot reach the Kind API server, so the local
+      # container runs in explicit demo mode. Deploy kubernetes/overlays/development
+      # for a live, in-cluster data source.
+      PLATFORM_DEMO_MODE: "true"
+      CORS_ALLOW_ORIGINS: http://localhost:13000,http://localhost:5173
+      SECURITY_FINDINGS_PATH: /app/security/findings.json
+    ports: ["18081:8080"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/api/health',timeout=2).status==200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 256M }
+
+  frontend:
+    build: { context: ., dockerfile: applications/frontend/Dockerfile }
+    image: platform/frontend:1.0.0
+    <<: *service-defaults
+    depends_on:
+      platform-api: { condition: service_healthy }
+      api-gateway: { condition: service_healthy }
+    ports: ["13000:8080"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: ["observability"]
+    <<: *service-defaults
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=6h
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus/prometheus.compose.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - prometheus-data:/prometheus
+    ports: ["19090:9090"]
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    profiles: ["observability"]
+    <<: *service-defaults
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports: ["19093:9093"]
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    profiles: ["observability"]
+    <<: *service-defaults
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/platform-overview.json
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      prometheus: { condition: service_started }
+    ports: ["13001:3000"]
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 384M }
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  platform:
+    driver: bridge
