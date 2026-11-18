@@ -1,0 +1,13 @@
+# Shared developer/CI tooling. Service runtime deps live in each service folder.
+-r applications/api-gateway/requirements.txt
+-r applications/user-service/requirements.txt
+-r applications/product-service/requirements.txt
+-r applications/order-service/requirements.txt
+-r applications/notification-service/requirements.txt
+-r platform-api/requirements.txt
+pytest>=8.2,<9.0
+pytest-asyncio>=0.23,<1.0
+pytest-cov>=5.0,<7.0
+ruff>=0.6,<1.0
+PyYAML>=6.0,<7.0
+jsonschema>=4.22,<5.0
