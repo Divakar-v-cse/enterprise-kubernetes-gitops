@@ -60,7 +60,7 @@ jobs:
             --cov=app --cov-report=term-missing --cov-fail-under=60
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: junit-${{ strategy.job-index }}
           path: reports/
@@ -82,7 +82,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: applications/frontend/dist
