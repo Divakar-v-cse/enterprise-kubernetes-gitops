@@ -1,0 +1,63 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: platform
+
+resources:
+  - ../../base
+
+# Single replica per service keeps the Kind node within its 3 GB memory budget.
+replicas:
+  - {name: api-gateway, count: 1}
+  - {name: user-service, count: 1}
+  - {name: product-service, count: 1}
+  - {name: order-service, count: 1}
+  - {name: notification-service, count: 1}
+  - {name: frontend, count: 1}
+  - {name: platform-api, count: 1}
+
+patches:
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: api-gateway
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: order-service
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: product-service
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+
+patches:
+  - target: {kind: ConfigMap, name: platform-config}
+    patch: |-
+      - op: replace
+        path: /data/APP_ENV
+        value: development
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: DEBUG
+
+labels:
+  - includeSelectors: false
+    pairs:
+      environment: development

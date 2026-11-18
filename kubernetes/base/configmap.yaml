@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-config
+  namespace: platform
+  labels:
+    app.kubernetes.io/part-of: gitops-platform
+data:
+  APP_ENV: "development"
+  LOG_LEVEL: "INFO"
+  METRICS_ENABLED: "true"
+  REQUEST_TIMEOUT_SECONDS: "2.5"
+  USER_SERVICE_URL: "http://user-service:8001"
+  PRODUCT_SERVICE_URL: "http://product-service:8002"
+  ORDER_SERVICE_URL: "http://order-service:8003"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:8004"
+  NOTIFICATION_REQUIRED: "false"
+  RATE_LIMIT_PER_MINUTE: "240"
+  CORS_ALLOW_ORIGINS: "http://localhost:13000,http://localhost:5173,http://localhost:18080,http://localhost:18081"
+  # Observability backends (in-cluster DNS).
+  PROMETHEUS_URL: "http://prometheus-server.monitoring.svc.cluster.local:9090"
+  ALERTMANAGER_URL: "http://alertmanager.monitoring.svc.cluster.local:9093"
+  LOKI_URL: "http://loki.logging.svc.cluster.local:3100"
+  ARGOCD_NAMESPACE: "argocd"
+  PLATFORM_DEMO_MODE: "false"
+  PLATFORM_AUTH_ENABLED: "true"
+  PLATFORM_NAMESPACES: "platform,monitoring,logging,argocd,security"
+  SECURITY_FINDINGS_PATH: "/app/security/findings.json"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: platform
+data:
+  init.sql: |
+    CREATE DATABASE users OWNER platform;
+    CREATE DATABASE products OWNER platform;
+    CREATE DATABASE orders OWNER platform;
+    CREATE DATABASE notifications OWNER platform;

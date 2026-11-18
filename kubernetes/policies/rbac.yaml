@@ -1,0 +1,55 @@
+# Application pods do not need Kubernetes API access at all, so the default
+# service account is stripped of token mounting in every Deployment.
+# These roles exist for humans and CI agents with narrowly scoped permissions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: platform-deployer
+  namespace: platform
+rules:
+  - apiGroups: ["", "apps"]
+    resources: [pods, deployments, replicasets, services, configmaps]
+    verbs: [get, list, watch]
+  - apiGroups: ["apps"]
+    resources: [deployments]
+    verbs: [patch, update]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: platform-developer
+  namespace: platform
+rules:
+  - apiGroups: ["", "apps", "batch", "networking.k8s.io", "autoscaling"]
+    resources: ["*"]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [pods/portforward, pods/log]
+    verbs: [get, create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: platform-deployer-binding
+  namespace: platform
+subjects:
+  # Replace with your CI service account / OIDC group. Example only.
+  - kind: ServiceAccount
+    name: ci-deployer
+    namespace: platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: platform-deployer
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-deployer
+  namespace: platform
+  labels:
+    app.kubernetes.io/part-of: gitops-platform
+automountServiceAccountToken: false

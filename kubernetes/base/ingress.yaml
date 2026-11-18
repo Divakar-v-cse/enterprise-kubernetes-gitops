@@ -1,0 +1,40 @@
+# Single entry point on the Kind host port 18080.
+#   http://localhost:18080/          -> frontend SPA
+#   http://localhost:18080/platform  -> platform API (/api/* rewritten)
+#   http://localhost:18080/gateway   -> api gateway  (/api/* rewritten)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform
+  namespace: platform
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/proxy-body-size: "2m"
+    nginx.ingress.kubernetes.io/enable-cors: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /platform(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: platform-api
+                port:
+                  number: 8080
+          - path: /gateway(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /()(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

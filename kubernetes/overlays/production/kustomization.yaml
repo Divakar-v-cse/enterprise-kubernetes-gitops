@@ -1,0 +1,64 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Production-shaped overlay. It is intentionally a separate namespace so a
+# local cluster can demonstrate dev/prod promotion without touching dev.
+namespace: platform-prod
+
+resources:
+  - ../../base
+
+replicas:
+  - {name: api-gateway, count: 3}
+  - {name: user-service, count: 3}
+  - {name: product-service, count: 3}
+  - {name: order-service, count: 3}
+  - {name: notification-service, count: 2}
+  - {name: frontend, count: 3}
+  - {name: platform-api, count: 2}
+
+patches:
+  - target: {kind: ConfigMap, name: platform-config}
+    patch: |-
+      - op: replace
+        path: /data/APP_ENV
+        value: production
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: INFO
+      - op: replace
+        path: /data/PLATFORM_DEMO_MODE
+        value: "false"
+  - target: {kind: Deployment, name: api-gateway}
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1"
+      - op: add
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 512Mi
+  - target: {kind: HorizontalPodAutoscaler, name: api-gateway}
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 10
+  - target: {kind: HorizontalPodAutoscaler, name: order-service}
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 8
+  - target: {kind: Ingress, name: platform}
+    patch: |-
+      - op: add
+        path: /metadata/annotations/nginx.ingress.kubernetes.io~1ssl-redirect
+        value: "true"
+
+labels:
+  - includeSelectors: false
+    pairs:
+      environment: production
