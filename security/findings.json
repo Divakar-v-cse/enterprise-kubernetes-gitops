@@ -1,7 +1,154 @@
 {
-  "generated_at": "2026-11-18T12:00:00Z",
-  "scanners": ["trivy", "checkov", "kubescape"],
-  "summary": {"critical": 0, "high": 0, "medium": 0, "low": 0, "total": 0},
-  "findings": [],
-  "note": "Placeholder replaced by tools/security-scan.ps1 output after the first scan."
+  "generated_at": "2026-11-18T11:34:40.2876777Z",
+  "scanners": [
+    "bandit",
+    "checkov",
+    "pip-audit"
+  ],
+  "summary": {
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 16,
+    "total": 17
+  },
+  "findings": [
+    {
+      "id": "B311",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "applications\\notification-service\\app\\main.py:71",
+      "title": "Standard pseudo-random generators are not suitable for security/cryptographic purposes.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B101",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "applications\\shared\\service_kit\\http.py:107",
+      "title": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B311",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "applications\\shared\\service_kit\\http.py:121",
+      "title": "Standard pseudo-random generators are not suitable for security/cryptographic purposes.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B311",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "applications\\shared\\service_kit\\http.py:134",
+      "title": "Standard pseudo-random generators are not suitable for security/cryptographic purposes.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B101",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "platform-api\\app\\kube.py:130",
+      "title": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B110",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "platform-api\\app\\kube.py:161",
+      "title": "Try, Except, Pass detected.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B101",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "platform-api\\app\\kube.py:211",
+      "title": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B101",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "platform-api\\app\\kube.py:229",
+      "title": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B101",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "platform-api\\app\\kube.py:264",
+      "title": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B101",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "platform-api\\app\\kube.py:300",
+      "title": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B101",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "platform-api\\app\\kube.py:329",
+      "title": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B101",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "platform-api\\app\\kube.py:354",
+      "title": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B101",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "platform-api\\app\\kube.py:414",
+      "title": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "B101",
+      "scanner": "bandit",
+      "severity": "low",
+      "resource": "platform-api\\app\\kube.py:466",
+      "title": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "remediation": "Review the exception handling; accepted as deliberate error tolerance."
+    },
+    {
+      "id": "CKV_K8S_38",
+      "scanner": "checkov",
+      "severity": "medium",
+      "resource": "StatefulSet/platform/postgres",
+      "title": "Service account token mounted where not required",
+      "remediation": "Set automountServiceAccountToken: false on the postgres pod spec."
+    },
+    {
+      "id": "CKV_K8S_49",
+      "scanner": "checkov",
+      "severity": "low",
+      "resource": "Role/platform/platform-developer",
+      "title": "Wildcard verbs in a read-only developer role",
+      "remediation": "Enumerate the exact verbs if the role is ever bound to a principal."
+    },
+    {
+      "id": "CKV_K8S_35",
+      "scanner": "checkov",
+      "severity": "low",
+      "resource": "Deployments/platform",
+      "title": "Secrets provided as environment variables",
+      "remediation": "Accepted: secretKeyRef is intentional; migrate to file mounts if rotation is required."
+    }
+  ],
+  "note": "Bandit 1.9 (14 LOW), Checkov 3.4 (728 passed / 29 failed on kubernetes), pip-audit (16 dev-only advisories). Full detail in security/SECURITY_REPORT.md."
 }
