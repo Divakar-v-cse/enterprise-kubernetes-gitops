@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+
+resources:
+  - prometheus/rbac.yaml
+  - prometheus/deployment.yaml
+  - alertmanager/deployment.yaml
+  - grafana/deployment.yaml
+  - exporters/node-exporter.yaml
+  - exporters/kube-state-metrics.yaml
+  - network-policies.yaml
+
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - prometheus.yml=prometheus/prometheus.yml
+      - alert-rules.yml=prometheus/alert-rules.yml
+  - name: alertmanager-config
+    files:
+      - alertmanager.yml=alertmanager/alertmanager.yml
+  - name: grafana-provisioning
+    files:
+      - datasources.yml=grafana/provisioning/datasources/datasource.yml
+      - dashboards.yml=grafana/provisioning/dashboards/dashboards.yml
+  - name: grafana-dashboards
+    files:
+      - grafana/dashboards/cluster-overview.json
+      - grafana/dashboards/node-health.json
+      - grafana/dashboards/pod-health.json
+      - grafana/dashboards/application-performance.json
+      - grafana/dashboards/api-latency.json
+      - grafana/dashboards/deployment-monitoring.json
+
+generatorOptions:
+  disableNameSuffixHash: true

@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: logging
+
+resources:
+  - loki/deployment.yaml
+  - promtail/daemonset.yaml
+
+configMapGenerator:
+  - name: loki-config
+    files:
+      - config.yml=loki/config.yml
+  - name: promtail-config
+    files:
+      - config.yml=promtail/config.yml
+
+generatorOptions:
+  disableNameSuffixHash: true

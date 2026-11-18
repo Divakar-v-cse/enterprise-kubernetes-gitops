@@ -1,0 +1,162 @@
+groups:
+  - name: platform.availability
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job="platform-pods"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: availability
+        annotations:
+          summary: "{{ $labels.service }} target is down"
+          description: >-
+            Prometheus has failed to scrape {{ $labels.namespace }}/{{ $labels.pod }}
+            for more than 2 minutes.
+          runbook: "docs/TROUBLESHOOTING.md#service-connectivity"
+
+      - alert: DeploymentUnavailable
+        expr: |
+          (
+            kube_deployment_status_replicas_available
+            /
+            clamp_min(kube_deployment_spec_replicas, 1)
+          ) < 0.5
+        for: 5m
+        labels:
+          severity: critical
+          component: availability
+        annotations:
+          summary: "Deployment {{ $labels.deployment }} has <50% availability"
+          description: "{{ $labels.namespace }}/{{ $labels.deployment }} has had fewer than half of its replicas available for 5 minutes."
+          runbook: "docs/TROUBLESHOOTING.md#deployment-issues"
+
+      - alert: ApplicationDowntime
+        expr: |
+          sum by (service) (rate(http_requests_total{status=~"2..|3.."}[5m])) == 0
+          and on(service)
+          sum by (service) (rate(http_requests_total[5m])) == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: availability
+        annotations:
+          summary: "{{ $labels.service }} is not serving traffic"
+          description: "No successful or failed requests recorded for 5 minutes; the service may be unreachable or idle."
+          runbook: "docs/TROUBLESHOOTING.md#service-connectivity"
+
+  - name: platform.reliability
+    interval: 30s
+    rules:
+      - alert: PodCrashLooping
+        expr: increase(kube_pod_container_status_restarts_total[15m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          component: pods
+        annotations:
+          summary: "Pod {{ $labels.pod }} is restarting frequently"
+          description: "{{ $labels.namespace }}/{{ $labels.pod }} restarted {{ $value | printf \"%.0f\" }} times in 15 minutes."
+          runbook: "docs/TROUBLESHOOTING.md#crashloopbackoff"
+
+      - alert: PodNotReady
+        expr: |
+          sum by (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Unknown"}) > 0
+        for: 10m
+        labels:
+          severity: warning
+          component: pods
+        annotations:
+          summary: "Pod {{ $labels.pod }} is not ready"
+          description: "{{ $labels.namespace }}/{{ $labels.pod }} has been Pending/Unknown for 10 minutes."
+          runbook: "docs/TROUBLESHOOTING.md#pending-pods"
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            clamp_min(sum by (service) (rate(http_requests_total[5m])), 0.001)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "{{ $labels.service }} 5xx error ratio above 5%"
+          description: "{{ $labels.service }} has served more than 5% 5xx responses for 5 minutes."
+          runbook: "docs/TROUBLESHOOTING.md#high-error-rate"
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, service) (rate(http_request_duration_seconds_bucket[5m]))
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "{{ $labels.service }} p95 latency above 1s"
+          description: "The 95th percentile request latency for {{ $labels.service }} has exceeded 1s for 5 minutes."
+          runbook: "docs/TROUBLESHOOTING.md#high-latency"
+
+  - name: platform.resources
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: |
+          sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{container!=""}[5m]))
+          /
+          clamp_min(sum by (namespace, pod) (kube_pod_container_resource_limits{resource="cpu"}), 0.001)
+          > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "Pod {{ $labels.pod }} CPU above 85% of limit"
+          description: "{{ $labels.namespace }}/{{ $labels.pod }} is CPU-throttled at its limit; check HPA behaviour."
+          runbook: "docs/TROUBLESHOOTING.md#high-cpu"
+
+      - alert: HighMemoryUsage
+        expr: |
+          sum by (namespace, pod) (container_memory_working_set_bytes{container!=""})
+          /
+          clamp_min(sum by (namespace, pod) (kube_pod_container_resource_limits{resource="memory"}), 1)
+          > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          component: resources
+        annotations:
+          summary: "Pod {{ $labels.pod }} memory above 85% of limit"
+          description: "{{ $labels.namespace }}/{{ $labels.pod }} is close to OOMKill; review requests/limits."
+          runbook: "docs/TROUBLESHOOTING.md#high-memory"
+
+      - alert: NodeMemoryPressure
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.90
+        for: 10m
+        labels:
+          severity: critical
+          component: node
+        annotations:
+          summary: "Node {{ $labels.node }} memory above 90%"
+          description: "Node {{ $labels.node }} may start evicting pods."
+          runbook: "docs/TROUBLESHOOTING.md#pending-pods"
+
+      - alert: PVCAlmostFull
+        expr: |
+          kubelet_volume_stats_available_bytes
+          /
+          clamp_min(kubelet_volume_stats_capacity_bytes, 1) < 0.15
+        for: 10m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "PVC {{ $labels.persistentvolumeclaim }} below 15% free"
+          description: "PostgreSQL writes will fail when this volume fills."
+          runbook: "docs/TROUBLESHOOTING.md#persistent-volume-issues"
