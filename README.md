@@ -182,3 +182,8 @@ Progressive delivery with Argo Rollouts, External Secrets Operator, multi-arch i
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Portfolio assets
+
+An 8-slide LinkedIn carousel, cover image and post copy live in [linkedin/](linkedin/). They are generated from this repository's verified results — see [linkedin/README.md](linkedin/README.md).
+
