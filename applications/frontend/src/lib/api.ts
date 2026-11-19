@@ -17,12 +17,33 @@ export interface RuntimeConfig {
   apiKey: string;
 }
 
-export const DEFAULT_CONFIG: RuntimeConfig = {
-  apiBase: "http://localhost:18081",
-  gatewayBase: "http://localhost:18005",
-  token: "platform-demo-token",
-  apiKey: "demo-public-key",
-};
+/**
+ * Same-origin deployment detection.
+ *
+ * When the SPA is served by the in-cluster NGINX ingress it is reachable at
+ * :18080 and the API paths are proxied under /platform and /gateway, so
+ * relative bases work without any manual configuration. Docker Compose keeps
+ * the explicit localhost ports.
+ */
+function isIngressDeployment(): boolean {
+  if (typeof window === "undefined") return false;
+  const { port } = window.location;
+  return port === "18080" || port === "18443";
+}
+
+export const DEFAULT_CONFIG: RuntimeConfig = isIngressDeployment()
+  ? {
+      apiBase: `${window.location.origin}/platform`,
+      gatewayBase: `${window.location.origin}/gateway`,
+      token: "platform-demo-token",
+      apiKey: "demo-public-key",
+    }
+  : {
+      apiBase: "http://localhost:18081",
+      gatewayBase: "http://localhost:18005",
+      token: "platform-demo-token",
+      apiKey: "demo-public-key",
+    };
 
 export const REQUEST_TIMEOUT_MS = 8000;
 

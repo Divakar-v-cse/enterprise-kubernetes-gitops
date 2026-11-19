@@ -43,6 +43,31 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<RuntimeConfig>(() => readStoredConfig());
 
+  // Runtime configuration generated at deploy time (scripts/configure-dashboard.ps1)
+  // supplies the cluster's read-only dashboard token, so a first visit works
+  // without manual setup. Explicit user settings always win.
+  useEffect(() => {
+    if (window.localStorage.getItem(STORAGE_KEY)) return;
+    let cancelled = false;
+    fetch(`${import.meta.env.BASE_URL}config.json`, { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((runtime: Partial<RuntimeConfig> | null) => {
+        if (cancelled || !runtime) return;
+        setConfig((previous) => ({
+          apiBase: runtime.apiBase || previous.apiBase,
+          gatewayBase: runtime.gatewayBase || previous.gatewayBase,
+          token: runtime.token || previous.token,
+          apiKey: runtime.apiKey || previous.apiKey,
+        }));
+      })
+      .catch(() => {
+        // Missing config.json is normal in Compose; defaults already apply.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     setRuntimeConfig(config);
   }, [config]);
