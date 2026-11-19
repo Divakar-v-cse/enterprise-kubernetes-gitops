@@ -37,8 +37,8 @@ jobs:
     name: Pre-deploy verification
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
         with:
           version: v3.16.3
       - name: Helm lint all charts
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GITOPS_PAT || secrets.GITHUB_TOKEN }}
       - name: Bump image tags
@@ -95,7 +95,7 @@ jobs:
     # Configure required reviewers on this GitHub Environment.
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GITOPS_PAT || secrets.GITHUB_TOKEN }}
       - name: Bump production overlay

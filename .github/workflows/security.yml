@@ -24,7 +24,7 @@ jobs:
     name: Trivy filesystem scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Trivy
         run: |
           set -euo pipefail
@@ -44,7 +44,7 @@ jobs:
             --severity HIGH,CRITICAL --format sarif --output trivy-fs.sarif .
       - name: Upload SARIF
         if: always() && hashFiles('trivy-fs.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-fs.sarif
           category: trivy-fs
@@ -53,7 +53,7 @@ jobs:
     name: Trivy Kubernetes/Docker misconfig
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Trivy
         run: |
           set -euo pipefail
@@ -68,7 +68,7 @@ jobs:
         run: trivy config --severity HIGH,CRITICAL --format sarif --output trivy-config.sarif .
       - name: Upload SARIF
         if: always() && hashFiles('trivy-config.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-config.sarif
           category: trivy-config
@@ -77,8 +77,8 @@ jobs:
     name: Checkov IaC scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install Checkov
@@ -98,13 +98,13 @@ jobs:
         run: checkov -d kubernetes --framework kubernetes --compact --quiet | tail -5 || true
       - name: Upload Kubernetes SARIF
         if: always() && hashFiles('checkov-k8s/**') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: checkov-k8s
           category: checkov-kubernetes
       - name: Upload Helm SARIF
         if: always() && hashFiles('checkov-helm/**') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: checkov-helm
           category: checkov-helm
@@ -113,8 +113,8 @@ jobs:
     name: Bandit (Python SAST)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install "bandit>=1.7,<2.0"
@@ -123,7 +123,7 @@ jobs:
         run: bandit -r applications platform-api -x "*/tests/*" -f txt -o bandit.txt || true
       - name: Publish report
         run: cat bandit.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: bandit-report
           path: bandit.txt
@@ -132,8 +132,8 @@ jobs:
     name: Dependency audit (pip-audit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install "pip-audit>=2.7,<3.0"
@@ -155,7 +155,7 @@ jobs:
     name: Block committed secrets
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Install gitleaks
@@ -191,7 +191,7 @@ jobs:
           - {service: frontend, dockerfile: applications/frontend/Dockerfile}
           - {service: platform-api, dockerfile: docker/platform-api.Dockerfile}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Trivy
         run: |
           set -euo pipefail
