@@ -298,3 +298,15 @@ Re-run locally before pushing:
 .\.venv\Scripts\python.exe -m pytest tests -q --ignore=tests/test_integration_live.py
 cd applications/frontend; npm run typecheck; npm run build
 ```
+
+### Second round (after the first fixes)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `invalid tag "ghcr.io/Divakar-v-cse/..."` | GHCR requires a lowercase repository name; `github.repository` keeps the account's capitals | a `meta` step lowercases the prefix before tagging |
+| `pull access denied for aquasecurity/trivy` | the scanner image is not pullable from the runner | Trivy is installed from a pinned release tarball (`v0.76.2`) |
+| `trivy: command not found` after installing | the install script wrote outside `PATH` | binaries unpack into `$GITHUB_WORKSPACE/.bin`, appended to `$GITHUB_PATH` |
+| Trivy install fails on only some matrix legs | unauthenticated GitHub API rate limit (60 req/h per runner IP) | versions are pinned; no API call at run time |
+| `buildx ... 403 Forbidden` on the GHCR token endpoint | the account/repo cannot publish packages | publishing is opt-in via the `PUSH_IMAGES` repository variable; CI builds images regardless |
+
+Set `PUSH_IMAGES=true` (Settings → Variables) plus valid package credentials only when you actually want images pushed to GHCR.

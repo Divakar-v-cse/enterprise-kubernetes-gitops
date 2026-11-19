@@ -166,12 +166,21 @@ jobs:
         # GHCR rejects uppercase repository names; github.repository preserves
         # the account's capitalisation (Divakar-v-cse/...).
         run: echo "prefix=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - name: Build (no push on PRs)
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PUSH_IMAGES == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build (no push unless PUSH_IMAGES=true)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          # Publishing is opt-in: set the repository variable PUSH_IMAGES=true
+          # and provide GHCR credentials. Without it CI still builds every image.
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PUSH_IMAGES == 'true' }}
           tags: |
             ghcr.io/${{ steps.meta.outputs.prefix }}/${{ matrix.image }}:${{ github.sha }}
             ghcr.io/${{ steps.meta.outputs.prefix }}/${{ matrix.image }}:latest

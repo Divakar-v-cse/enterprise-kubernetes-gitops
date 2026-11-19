@@ -15,4 +15,5 @@ Required repository settings after the first push:
 - Actions → General → allow workflows.
 - Environments → `development` (no reviewers) and `production` (required reviewers).
 - Optional secret `GITOPS_PAT` if the bot must push to a protected `main`.
-- Optional `GITHUB_TOKEN` package write permission for GHCR pushes (declared in `ci.yml`).
+- Optional `PUSH_IMAGES=true` repository variable plus GHCR credentials to publish images. Without it, CI builds every image but pushes nothing (the account cannot currently create GHCR packages).
+
