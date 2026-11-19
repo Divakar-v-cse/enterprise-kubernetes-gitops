@@ -3,7 +3,7 @@
 replicaCount: 1
 image:
   repository: platform/user-service
-  tag: "db771a48e02ee478aa1619eaf6b9bd4227b5159e"
+  tag: "067cbb0b5d962022920f6842358b50794546759b"
   pullPolicy: IfNotPresent
 containerPort: 8001
 service:
