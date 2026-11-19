@@ -1,0 +1,30 @@
+# Gitleaks configuration.
+# The repository intentionally documents local-only demo credentials
+# (`demo-public-key`, `dev-internal-token`, `platform-demo-token`). They are
+# not production secrets, they are generated in-cluster by
+# scripts/create-dev-secrets.ps1, and they are allow-listed here so the secret
+# scanner reports genuine leaks instead of documentation.
+
+title = "enterprise-kubernetes-gitops"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented local demo values and generated artifacts"
+paths = [
+  '''.env.example''',
+  '''docs/.*''',
+  '''README.md''',
+  '''screenshots/README.md''',
+  '''security/artifacts/.*''',
+  '''rendered/.*''',
+]
+
+regexes = [
+  '''demo-public-key''',
+  '''dev-internal-token''',
+  '''platform-demo-token''',
+  '''POSTGRES_PASSWORD=platform''',
+  '''X-API-Key: demo-public-key''',
+]

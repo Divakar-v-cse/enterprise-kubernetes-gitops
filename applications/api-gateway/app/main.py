@@ -18,6 +18,7 @@ from fastapi import Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import Counter
+
 from service_kit import (
     ApiError,
     BaseSettings,

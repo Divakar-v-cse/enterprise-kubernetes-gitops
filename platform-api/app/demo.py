@@ -8,9 +8,9 @@ can show a persistent DEMO badge instead of pretending this is live data.
 from __future__ import annotations
 
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-NOW = datetime.now(timezone.utc)
+NOW = datetime.now(UTC)
 
 SERVICES = [
     ("api-gateway", 2, "platform"),
@@ -208,7 +208,7 @@ def workloads() -> list[dict]:
 
 def metrics() -> dict:
     """Deterministic 30-point series so charts are stable between refreshes."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     times = [now - timedelta(minutes=5 * (29 - i)) for i in range(30)]
     cpu = [round(0.18 + 0.10 * math.sin(i / 4) + (i % 5) * 0.006, 3) for i in range(30)]
     memory = [round(0.62 + 0.04 * math.cos(i / 6), 3) for i in range(30)]
@@ -217,13 +217,13 @@ def metrics() -> dict:
     return {
         "series": [
             {"name": "cpu_utilization", "unit": "ratio",
-             "points": [{"t": t.isoformat(), "v": v} for t, v in zip(times, cpu)]},
+             "points": [{"t": t.isoformat(), "v": v} for t, v in zip(times, cpu, strict=True)]},
             {"name": "memory_utilization", "unit": "ratio",
-             "points": [{"t": t.isoformat(), "v": v} for t, v in zip(times, memory)]},
+             "points": [{"t": t.isoformat(), "v": v} for t, v in zip(times, memory, strict=True)]},
             {"name": "http_request_rate", "unit": "req/s",
-             "points": [{"t": t.isoformat(), "v": v} for t, v in zip(times, rps)]},
+             "points": [{"t": t.isoformat(), "v": v} for t, v in zip(times, rps, strict=True)]},
             {"name": "http_p95_latency", "unit": "seconds",
-             "points": [{"t": t.isoformat(), "v": v} for t, v in zip(times, latency)]},
+             "points": [{"t": t.isoformat(), "v": v} for t, v in zip(times, latency, strict=True)]},
         ],
         "top_pods": [
             {"pod": "prometheus-0", "namespace": "monitoring", "cpu_millicores": 210, "memory_mib": 780},
@@ -241,7 +241,7 @@ def metrics() -> dict:
 
 
 def alerts() -> list[dict]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return [
         {
             "id": "alert-order-restarts", "name": "PodRestartingFrequently", "severity": "warning",
@@ -264,7 +264,7 @@ def alerts() -> list[dict]:
 
 def gitops() -> list[dict]:
     apps = []
-    for name, replicas, _namespace in SERVICES:
+    for name, _replicas, _namespace in SERVICES:
         apps.append(
             {
                 "name": name,
@@ -286,7 +286,7 @@ def gitops() -> list[dict]:
 
 
 def logs() -> list[dict]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     entries = [
         ("api-gateway", "INFO", "request", {"method": "GET", "path": "/api/products", "status": 200,
                                             "duration_ms": 18.4}),
@@ -328,3 +328,4 @@ def security() -> dict:
         ],
         "note": "Demo findings shown because no security/findings.json is bundled.",
     }
+

@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 
 from fastapi import APIRouter, Depends, Header, Query, Request, status
 from prometheus_client import Counter
+from sqlalchemy import func, select
+
 from service_kit import (
     ApiError,
     BaseSettings,
@@ -14,7 +16,6 @@ from service_kit import (
     build_app,
     get_logger,
 )
-from sqlalchemy import func, select
 
 from .clients import build_clients
 from .deps import require_internal_token

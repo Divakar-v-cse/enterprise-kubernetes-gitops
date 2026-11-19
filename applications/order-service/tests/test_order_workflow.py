@@ -23,9 +23,9 @@ os.environ["LOG_LEVEL"] = "WARNING"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from service_kit import UpstreamError  # noqa: E402
 
 from app import main as order_main  # noqa: E402
+from service_kit import UpstreamError  # noqa: E402
 
 HEADERS = {"X-Internal-Token": "test-token"}
 

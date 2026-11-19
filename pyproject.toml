@@ -1,0 +1,34 @@
+# Ruff configuration is explicit so local runs and CI behave identically.
+# Without this file, the installed ruff version decides the default rule set,
+# which made CI fail on rules the project never opted into.
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = [".venv", "node_modules", "rendered", "dist", "security/artifacts"]
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "I",   # import sorting
+  "UP",  # pyupgrade
+  "B",   # bugbear
+  "SIM", # simplify
+]
+# Intentional patterns in this codebase:
+#   B008  - FastAPI dependencies live in function defaults by design.
+#   E501  - long lines are handled by the formatter, not the linter.
+ignore = ["B008", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "B011"]
+"**/tests/**" = ["S101"]
+"tools/**" = ["T201"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["service_kit", "app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

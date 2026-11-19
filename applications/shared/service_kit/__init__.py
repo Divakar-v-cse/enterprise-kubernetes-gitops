@@ -5,12 +5,12 @@ configuration, structured JSON logging, Prometheus metrics, error handling,
 health probes and a resilient service-to-service HTTP client.
 """
 
-from .config import BaseSettings, env_bool, env_int
-from .logging import configure_logging, get_logger
-from .metrics import install_metrics, REQUEST_COUNT, REQUEST_LATENCY
-from .errors import ApiError, install_error_handlers
-from .http import ServiceClient, CircuitOpenError, UpstreamError
 from .app_factory import build_app
+from .config import BaseSettings, env_bool, env_int
+from .errors import ApiError, install_error_handlers
+from .http import CircuitOpenError, ServiceClient, UpstreamError
+from .logging import configure_logging, get_logger
+from .metrics import REQUEST_COUNT, REQUEST_LATENCY, install_metrics
 
 
 def __getattr__(name: str):

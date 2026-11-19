@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Query, status
 from prometheus_client import Counter
-from service_kit import ApiError, BaseSettings, Database, build_app, get_logger
 from sqlalchemy import func, select
+
+from service_kit import ApiError, BaseSettings, Database, build_app, get_logger
 
 from .deps import require_internal_token
 from .models import Notification
@@ -106,7 +107,7 @@ async def create_notification(payload: NotificationCreate) -> NotificationOut:
         )
         notification.status = _dispatch(notification)
         if notification.status == "sent":
-            notification.sent_at = datetime.now(timezone.utc)
+            notification.sent_at = datetime.now(UTC)
         session.add(notification)
         await session.commit()
         await session.refresh(notification)
@@ -162,7 +163,7 @@ async def retry_notification(notification_id: str) -> NotificationOut:
         notification.attempts += 1
         notification.status = _dispatch(notification)
         if notification.status == "sent":
-            notification.sent_at = datetime.now(timezone.utc)
+            notification.sent_at = datetime.now(UTC)
         await session.commit()
         await session.refresh(notification)
         SENT.labels(notification.channel, notification.status).inc()

@@ -19,9 +19,9 @@ os.environ["RATE_LIMIT_PER_MINUTE"] = "5"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from service_kit import UpstreamError  # noqa: E402
 
 from app import main as gateway  # noqa: E402
+from service_kit import UpstreamError  # noqa: E402
 
 
 class FakeClient:

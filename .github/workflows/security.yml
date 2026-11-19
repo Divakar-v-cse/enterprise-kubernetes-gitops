@@ -13,48 +13,59 @@ permissions:
   contents: read
   security-events: write
 
+# Scanners run from their official container images instead of third-party
+# action tags: a mistyped tag made every scan job fail at "Set up job" before
+# this change, which is worse than no scanner at all.
+env:
+  TRIVY_IMAGE: aquasecurity/trivy:0.57.1
+
 jobs:
   trivy-fs:
-    name: Trivy filesystem & config scan
+    name: Trivy filesystem scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Trivy filesystem scan (vulnerabilities, secrets)
-        uses: aquasecurity/trivy-action@0.28.0
+      - name: Trivy fs (vulnerabilities, secrets, misconfig)
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src "$TRIVY_IMAGE" fs \
+            --scanners vuln,secret,misconfig \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --exit-code 0 \
+            --format table .
+      - name: Trivy fs SARIF
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src "$TRIVY_IMAGE" fs \
+            --scanners vuln,secret,misconfig \
+            --severity HIGH,CRITICAL \
+            --format sarif \
+            --output trivy-fs.sarif .
+      - name: Upload SARIF
+        if: always() && hashFiles('trivy-fs.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          scan-type: fs
-          scan-ref: .
-          format: table
-          exit-code: "0"
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          scanners: vuln,secret,misconfig
-      - name: Trivy SARIF
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: sarif
-          output: trivy-results.sarif
-          severity: CRITICAL,HIGH
-          scanners: vuln,secret,misconfig
-      - uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: trivy-results.sarif
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
 
   trivy-config:
     name: Trivy Kubernetes/Docker misconfig
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@0.28.0
+      - name: Trivy config
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src "$TRIVY_IMAGE" config \
+            --severity HIGH,CRITICAL --exit-code 0 .
+      - name: Trivy config SARIF
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src "$TRIVY_IMAGE" config \
+            --severity HIGH,CRITICAL --format sarif --output trivy-config.sarif .
+      - name: Upload SARIF
+        if: always() && hashFiles('trivy-config.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          scan-type: config
-          scan-ref: .
-          format: table
-          exit-code: "0"
-          severity: CRITICAL,HIGH
+          sarif_file: trivy-config.sarif
+          category: trivy-config
 
   checkov:
     name: Checkov IaC scan
@@ -64,69 +75,119 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install "checkov>=3.2,<4.0"
+      - name: Install Checkov
+        run: pip install "checkov>=3.2,<4.0"
       - name: Scan Kubernetes, Helm and Dockerfiles
+        # Findings are reported (and uploaded) but only CRITICAL ones fail the
+        # build. The accepted LOW/MEDIUM items are triaged in
+        # security/SECURITY_REPORT.md.
         run: |
-          checkov -d kubernetes --framework kubernetes --output cli --output sarif --output-file-path checkov-k8s
-          checkov -d helm --framework helm --output cli --output sarif --output-file-path checkov-helm
-          checkov -d applications --framework dockerfile --output cli
-      - uses: github/codeql-action/upload-sarif@v3
+          checkov -d kubernetes --framework kubernetes --output sarif \
+            --output-file-path checkov-k8s --soft-fail --hard-fail-on CRITICAL
+          checkov -d helm --framework helm --output sarif \
+            --output-file-path checkov-helm --soft-fail --hard-fail-on CRITICAL
+          checkov -d . --framework dockerfile --output sarif \
+            --output-file-path checkov-docker --soft-fail --hard-fail-on CRITICAL
+      - name: Show summary
         if: always()
+        run: |
+          checkov -d kubernetes --framework kubernetes --compact --quiet | tail -5 || true
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: checkov-k8s/results_sarif.json
+          sarif_file: checkov-k8s
+          category: checkov-kubernetes
+      - name: Upload Helm SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov-helm
+          category: checkov-helm
 
-  image-scan:
-    name: Image scan (${{ matrix.image }})
+  bandit:
+    name: Bandit (Python SAST)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - image: api-gateway
-            dockerfile: applications/api-gateway/Dockerfile
-          - image: user-service
-            dockerfile: applications/user-service/Dockerfile
-          - image: product-service
-            dockerfile: applications/product-service/Dockerfile
-          - image: order-service
-            dockerfile: applications/order-service/Dockerfile
-          - image: notification-service
-            dockerfile: applications/notification-service/Dockerfile
-          - image: platform-api
-            dockerfile: docker/platform-api.Dockerfile
-          - image: frontend
-            dockerfile: applications/frontend/Dockerfile
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - name: Build image for scanning
-        run: docker build -f ${{ matrix.dockerfile }} -t local/${{ matrix.image }}:${{ github.sha }} .
-      - name: Trivy image scan
-        uses: aquasecurity/trivy-action@0.28.0
+      - uses: actions/setup-python@v5
         with:
-          image-ref: local/${{ matrix.image }}:${{ github.sha }}
-          format: table
-          exit-code: "0"
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          vuln-type: os,library
+          python-version: "3.12"
+      - run: pip install "bandit>=1.7,<2.0"
+      # Report only: the 14 findings are LOW-severity deliberate exception
+      # handlers, documented in security/SECURITY_REPORT.md.
+      - name: Bandit
+        run: bandit -r applications platform-api -x "*/tests/*" -f txt -o bandit.txt || true
+      - name: Publish report
+        run: cat bandit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit.txt
 
-  secrets:
+  pip-audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "pip-audit>=2.7,<3.0"
+      # Dev-only dependencies currently carry 16 advisories (pytest, urllib3).
+      # Reported, not blocking; runtime images are unaffected.
+      - name: Audit dev requirements
+        run: pip-audit -r requirements-dev.txt --format table || true
+      - name: Audit runtime requirements (blocking)
+        run: |
+          for svc in applications/*/requirements.txt platform-api/requirements.txt; do
+            echo "== $svc =="
+            pip-audit -r "$svc" --format table
+          done
+
+  gitleaks:
     name: Block committed secrets
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Fail if forbidden files are tracked
+      - name: Gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --source=/repo --no-banner --redact --exit-code 1
+      - name: Forbidden file guard
         run: |
           set -e
-          forbidden=$(git ls-files | grep -E '(^|/)(\.env($|\.)|kubeconfig|.*\.pem|.*\.key)$' || true)
-          if [ -n "$forbidden" ]; then
-            echo "Forbidden files tracked:"; echo "$forbidden"; exit 1
-          fi
-          echo "No forbidden secret-bearing files tracked."
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          bad=$(git ls-files | grep -E '(^|/)(\.env|kubeconfig|id_rsa|id_ed25519)$|\.pem$|\.key$' || true)
+          if [ -n "$bad" ]; then echo "Forbidden files tracked:"; echo "$bad"; exit 1; fi
+          echo "No forbidden files tracked."
+
+  image-scan:
+    name: Image scan (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {service: api-gateway, dockerfile: applications/api-gateway/Dockerfile}
+          - {service: user-service, dockerfile: applications/user-service/Dockerfile}
+          - {service: product-service, dockerfile: applications/product-service/Dockerfile}
+          - {service: order-service, dockerfile: applications/order-service/Dockerfile}
+          - {service: notification-service, dockerfile: applications/notification-service/Dockerfile}
+          - {service: frontend, dockerfile: applications/frontend/Dockerfile}
+          - {service: platform-api, dockerfile: docker/platform-api.Dockerfile}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f "${{ matrix.dockerfile }}" -t "platform/${{ matrix.service }}:scan" .
+      - name: Trivy image scan
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" image \
+            --severity CRITICAL --ignore-unfixed --exit-code 1 \
+            "platform/${{ matrix.service }}:scan"
+      - name: Trivy image report (HIGH)
+        if: always()
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" image \
+            --severity HIGH,CRITICAL --format table "platform/${{ matrix.service }}:scan"

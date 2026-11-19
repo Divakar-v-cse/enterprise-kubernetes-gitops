@@ -9,16 +9,15 @@ monitoring backend is unreachable.
 from __future__ import annotations
 
 import json
-import math
-import os
 import time
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import httpx
+
 from kubernetes import client, config
-from kubernetes.client.rest import ApiException
 
 from . import demo
 from .config import settings
@@ -63,8 +62,8 @@ def age_of(timestamp: datetime | None) -> str:
     if timestamp is None:
         return "unknown"
     if timestamp.tzinfo is None:
-        timestamp = timestamp.replace(tzinfo=timezone.utc)
-    delta = datetime.now(timezone.utc) - timestamp
+        timestamp = timestamp.replace(tzinfo=UTC)
+    delta = datetime.now(UTC) - timestamp
     seconds = int(delta.total_seconds())
     days, rem = divmod(seconds, 86400)
     hours, rem = divmod(rem, 3600)
@@ -516,7 +515,7 @@ def _prom_range(query: str, minutes: int = 150) -> list[dict]:
         if not result:
             return []
         return [
-            {"t": datetime.fromtimestamp(float(ts), tz=timezone.utc).isoformat(), "v": round(float(val), 4)}
+            {"t": datetime.fromtimestamp(float(ts), tz=UTC).isoformat(), "v": round(float(val), 4)}
             for ts, val in result[0].get("values", [])
         ]
 
@@ -560,9 +559,9 @@ def _last_value(series: list[dict], name: str) -> float:
 
 
 def _loki_logs(namespace: str | None, pod: str | None, level: str | None, limit: int) -> list[dict] | None:
-    selectors = ['{namespace="%s"}' % namespace] if namespace else ['{namespace=~".+"}']
+    selectors = [f'{{namespace="{namespace}"}}'] if namespace else ['{namespace=~".+"}']
     if pod:
-        selectors = ['{pod="%s"}' % pod]
+        selectors = [f'{{pod="{pod}"}}']
     if level:
         selectors.append(f'| json | level="{level.upper()}"')
     query = " ".join(selectors)
@@ -583,7 +582,7 @@ def _loki_logs(namespace: str | None, pod: str | None, level: str | None, limit:
                     except ValueError:
                         fields = {"message": line}
                     rows.append({
-                        "timestamp": datetime.fromtimestamp(int(ts) / 1e9, tz=timezone.utc).isoformat(),
+                        "timestamp": datetime.fromtimestamp(int(ts) / 1e9, tz=UTC).isoformat(),
                         "service": fields.get("service", labels.get("app", "unknown")),
                         "level": fields.get("level", "INFO"),
                         "message": fields.get("message", line),
@@ -598,3 +597,4 @@ def _loki_logs(namespace: str | None, pod: str | None, level: str | None, limit:
 
 
 cluster = ClusterAccess()
+
