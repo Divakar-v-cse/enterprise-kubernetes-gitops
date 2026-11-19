@@ -9,7 +9,11 @@ COPY applications/frontend/tsconfig.json applications/frontend/tsconfig.node.jso
 COPY applications/frontend/src ./src
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+# Pick up patched Alpine packages (openssl, brotli) available after the base
+# image was built; three CRITICAL CVEs were found in 1.27-alpine.
+USER root
+RUN apk upgrade --no-cache
 LABEL org.opencontainers.image.title="frontend" \
       org.opencontainers.image.vendor="Enterprise Kubernetes GitOps Platform"
 USER 101
@@ -19,3 +23,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD ["wget", "-qO-", "http://127.0.0.1:8080/healthz"]
 CMD ["nginx", "-g", "daemon off;"]
+
+
