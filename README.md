@@ -143,7 +143,7 @@ Status in this environment: **46 backend tests pass**, **47 static/policy tests 
 
 `.github/workflows/ci.yml` runs lint, a per-service test matrix, frontend typecheck/build, kustomize + kubeconform + Helm validation, and multi-arch image builds (pushing only on `main`). `security.yml` adds Trivy filesystem/config/image scans, Checkov, gitleaks and a forbidden-file guard. `deploy.yml` updates image tags in Git (never `kubectl apply`) and requires a GitHub Environment approval for production. `jenkins/Jenkinsfile` mirrors the same stages.
 
-These workflows are configured but were not executed on GitHub from this environment — the repository owner must enable Actions after the first push.
+Both workflows run on GitHub and are green on main (CI run 44495990389, Security run 44495990307). Image publishing to GHCR is opt-in via the PUSH_IMAGES repository variable because this account cannot currently create packages; builds and scans run regardless.
 
 ## Security
 

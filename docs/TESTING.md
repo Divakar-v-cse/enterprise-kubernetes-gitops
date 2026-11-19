@@ -86,7 +86,7 @@ helm template api-gateway helm/charts/api-gateway | kubeconform -strict -summary
 
 | Item | Reason | How to run |
 |---|---|---|
-| GitHub Actions execution | Workflows run on GitHub only after push | Push, then Actions tab |
+| GitHub Actions execution | **Executed on GitHub** after the CI fixes: CI and Security both pass on main (runs 44495990389 / 44495990307) | gh run list --branch main |
 | Frontend component tests | No test runner or DOM harness installed; logic verified through typecheck + build | `npm i -D vitest @testing-library/react` then `npm test` |
 | HPA scale-out under load | Single-node Kind with a 3 GB budget | `k6 run` or `hey -z 3m` against the gateway, then `kubectl get hpa -w` |
 | Kubescape | Not installed in this environment | `curl -s https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh \| /bin/bash` then `kubescape scan framework nsa` |

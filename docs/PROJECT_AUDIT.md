@@ -103,7 +103,7 @@ Legend: **Complete** = implemented and verified · **Incomplete** = implemented,
 | Secret scanning | Complete | gitleaks + tracked-file guard |
 | Deployment validation | Complete | `deploy.yml` verification job before promotion |
 | Jenkinsfile | Complete | `jenkins/Jenkinsfile` mirrors stages with approval input |
-| Workflow execution on GitHub | Incomplete | Workflows are configured; GitHub Actions has not run them yet |
+| Workflow execution on GitHub | Complete | CI and Security pass on main (runs 44495990389 / 44495990307) |
 
 ## 8. Security
 
@@ -132,7 +132,7 @@ Legend: **Complete** = implemented and verified · **Incomplete** = implemented,
 | Docker build checks | Complete | 7 images built successfully |
 | Manifest validation | Complete | 47 static tests + kubeconform via CI |
 | Helm validation | Complete | `tests/test_helm_charts.py` lints and renders all 7 charts |
-| CI workflow validation | Incomplete | YAML parsed; no remote execution yet |
+| CI workflow validation | Complete | Six green jobs on GitHub plus two Dependabot update runs |
 
 ## 10. Documentation
 
@@ -164,7 +164,7 @@ Legend: **Complete** = implemented and verified · **Incomplete** = implemented,
 | Dashboard / pods / GitOps / monitoring / security captures | Complete | Real captures from this environment |
 | Grafana dashboard capture | Complete | Live provisioned dashboard |
 | Prometheus targets capture | Complete | Live scrape targets |
-| GitHub Actions capture | Missing | Actions have not executed on GitHub yet; no image fabricated |
+| GitHub Actions capture | Incomplete | Runs are green; no screenshot captured yet |
 | Demo video | N/A | Recording script provided; no fabricated footage |
 
 ## Summary
