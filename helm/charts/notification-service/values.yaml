@@ -3,7 +3,7 @@
 replicaCount: 1
 image:
   repository: platform/notification-service
-  tag: "d6d12e8804b1773ba94e2d9738aa892381619836"
+  tag: "db771a48e02ee478aa1619eaf6b9bd4227b5159e"
   pullPolicy: IfNotPresent
 containerPort: 8004
 service:
