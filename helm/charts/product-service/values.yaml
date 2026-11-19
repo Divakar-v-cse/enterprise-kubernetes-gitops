@@ -3,7 +3,7 @@
 replicaCount: 1
 image:
   repository: platform/product-service
-  tag: 1.0.0
+  tag: "d6d12e8804b1773ba94e2d9738aa892381619836"
   pullPolicy: IfNotPresent
 containerPort: 8002
 service:
